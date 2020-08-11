@@ -37,7 +37,10 @@ export default class App extends Component {
     this.handleStopScan = this.handleStopScan.bind(this);
     this.handleUpdateValueForCharacteristic = this.handleUpdateValueForCharacteristic.bind(this);
     this.handleDisconnectedPeripheral = this.handleDisconnectedPeripheral.bind(this);
+    this.testestConnected = this.getRssi.bind(this);
     this.handleAppStateChange = this.handleAppStateChange.bind(this);
+    this.testtesttest = this.getServices.bind(this);
+    this.tryFunction = this.tryFunction.bind(this);
   }
 
   componentDidMount() {
@@ -75,6 +78,10 @@ export default class App extends Component {
       console.log('App has come to the foreground!')
       BleManager.getConnectedPeripherals([]).then((peripheralsArray) => {
         console.log('Connected peripherals: ' + peripheralsArray.length);
+        console.log(JSON.stringify(this.state))
+        console.log(JSON.stringify(this.state.peripherals))
+
+
       });
     }
     this.setState({appState: nextAppState});
@@ -108,6 +115,7 @@ export default class App extends Component {
   }
 
   startScan() {
+    console.log(this.state)
     if (!this.state.scanning) {
       //this.setState({peripherals: new Map()});
       BleManager.scan([], 3, true).then((results) => {
@@ -128,9 +136,52 @@ export default class App extends Component {
         var peripheral = results[i];
         peripheral.connected = true;
         peripherals.set(peripheral.id, peripheral);
+        console.log(peripheral)
         this.setState({ peripherals });
       }
     });
+  }
+
+  getRssi(){
+    console.log(JSON.stringify(this.state) )
+    console.log('this.state')
+    BleManager.readRSSI("E3:4C:13:08:FD:2E")
+    .then((rssi) => {
+      // Success code
+      console.log("Current RSSI: " + rssi);
+    })
+    .catch((error) => {
+      // Failure code
+      console.log(error);
+    });
+  }
+  getServices(){
+    console.log(JSON.stringify(this.state) )
+    console.log('this.state')
+
+
+    BleManager.retrieveServices("E3:4C:13:08:FD:2E").then(
+      (peripheralInfo) => {
+        // Success code
+        console.log("Peripheral info:", peripheralInfo);
+      }
+    );
+  }
+
+  tryFunction(){
+    BleManager.startNotification(
+      "E3:4C:13:08:FD:2E",
+      "6e400001-b5a3-f393-e0a9-e50e24dcca9e",
+      "0001"
+    )
+      .then(() => {
+        // Success code
+        console.log("Notification started");
+      })
+      .catch((error) => {
+        // Failure code
+        console.log(error);
+      });
   }
 
   handleDiscoverPeripheral(peripheral){
@@ -173,9 +224,9 @@ export default class App extends Component {
             // Test using bleno's pizza example
             // https://github.com/sandeepmistry/bleno/tree/master/examples/pizza
             BleManager.retrieveServices(peripheral.id).then((peripheralInfo) => {
-              console.log(peripheralInfo);
-              var service = '13333333-3333-3333-3333-333333333337';
-              var bakeCharacteristic = '13333333-3333-3333-3333-333333330003';
+              console.log(JSON.stringify(peripheralInfo));
+              var service = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+              var bakeCharacteristic = '0000180f-0000-1000-8000-00805f9b34fb';
               var crustCharacteristic = '13333333-3333-3333-3333-333333330001';
 
               setTimeout(() => {
@@ -215,6 +266,7 @@ export default class App extends Component {
   renderItem(item) {
     const color = item.connected ? 'green' : '#fff';
     return (
+      <>
       <TouchableHighlight onPress={() => this.test(item) }>
         <View style={[styles.row, {backgroundColor: color}]}>
           <Text style={{fontSize: 12, textAlign: 'center', color: '#333333', padding: 10}}>{item.name}</Text>
@@ -222,6 +274,7 @@ export default class App extends Component {
           <Text style={{fontSize: 8, textAlign: 'center', color: '#333333', padding: 2, paddingBottom: 20}}>{item.id}</Text>
         </View>
       </TouchableHighlight>
+      </>
     );
   }
 
@@ -238,7 +291,16 @@ export default class App extends Component {
           </View>
 
           <View style={{margin: 10}}>
-            <Button title="Retrieve connected peripherals" onPress={() => this.retrieveConnected() } />
+          <Button title="Retrieve connected peripherals" onPress={() => this.retrieveConnected() } />
+          </View>
+          <View style={{margin: 10}}>
+            <Button title="getRci" onPress={() => this.getRssi() } />
+          </View>
+          <View style={{margin: 10}}>
+            <Button title="testtesttest" onPress={() => this.getServices() } />
+          </View>
+          <View style={{margin: 10}}>
+            <Button title="tryFunction" onPress={() => this.tryFunction() } />
           </View>
 
           <ScrollView style={styles.scroll}>
