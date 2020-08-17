@@ -192,12 +192,12 @@ export default class App extends Component {
   write() {
     const data = stringToBytes('55aa032001b50422ff');
     console.log(data);
-    BleManager.writeWithoutResponse(
+    BleManager.write(
       'D1:A8:C2:24:19:8E',
       '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
-      '6e400004-b5a3-f393-e0a9-e50e24dcca9e',
+      '6e400003-b5a3-f393-e0a9-e50e24dcca9e',
       data,
-      8
+      2,
     )
       .then(() => {
         // Success code
@@ -267,7 +267,6 @@ export default class App extends Component {
               // https://github.com/sandeepmistry/bleno/tree/master/examples/pizza
               BleManager.retrieveServices(peripheral.id).then(
                 (peripheralInfo) => {
-                  console.log(JSON.stringify(peripheralInfo));
                   var service = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
                   var bakeCharacteristic =
                     '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
@@ -287,25 +286,27 @@ export default class App extends Component {
                       peripheral.id,
                       service,
                       bakeCharacteristic,
+                      4,
                     )
                       .then((e) => {
-                        console.log(e)
+                        console.log(e);
                         console.log('Started notification on ' + peripheral.id);
                         setTimeout(() => {
-                          BleManager.writeWithoutResponse(
+                          BleManager.write(
                             peripheral.id,
                             service,
                             crustCharacteristic,
                             data,
-                            8
+                            4,
                           ).then((e) => {
                             console.log(e);
                             console.log('Writed NORMAL crust');
-                            BleManager.writeWithoutResponse(
+                            BleManager.write(
                               peripheral.id,
                               service,
                               crustCharacteristic,
                               data,
+                              4,
                             ).then((e) => {
                               console.log(e);
 
