@@ -16,7 +16,11 @@ import {
   SafeAreaView,
 } from 'react-native';
 import BleManager from 'react-native-ble-manager';
-import ScooterServices from './ScooterServices';
+import {
+  Scooter,
+  makeMessageForLock,
+  makeMessageForUnlock,
+} from './ScooterServices';
 
 const window = Dimensions.get('window');
 
@@ -47,7 +51,10 @@ export default class App extends Component {
   componentDidMount() {
     AppState.addEventListener('change', this.handleAppStateChange);
 
-    BleManager.start({showAlert: false});
+    BleManager.start({showAlert: false}).then(
+      () => console.log('started'),
+      () => console.log('err'),
+    );
 
     this.handlerDiscover = bleManagerEmitter.addListener(
       'BleManagerDiscoverPeripheral',
@@ -65,6 +72,13 @@ export default class App extends Component {
       'BleManagerDidUpdateValueForCharacteristic',
       this.handleUpdateValueForCharacteristic,
     );
+
+    if (Platform.OS === 'android') {
+      BleManager.enableBluetooth().then(
+        () => console.log('bluetooth is enabled'),
+        () => console.log('bluetooth not enabled'),
+      );
+    }
 
     if (Platform.OS === 'android' && Platform.Version >= 23) {
       PermissionsAndroid.check(
@@ -136,10 +150,14 @@ export default class App extends Component {
   startScan() {
     if (!this.state.scanning) {
       //this.setState({peripherals: new Map()});
-      BleManager.scan([], 3, true).then((results) => {
-        console.log('Scanning...');
-        this.setState({scanning: true});
-      });
+      BleManager.scan([Scooter.service], 3, true)
+        .then((results) => {
+          console.log('Scanning...');
+          this.setState({scanning: true});
+        })
+        .catch((err) => {
+          console.error('caught err', err);
+        });
     }
   }
 
@@ -175,7 +193,14 @@ export default class App extends Component {
     }
 
     if (peripheral.connected) {
-      return BleManager.disconnect(peripheral.id);
+      await BleManager.stopNotification(
+        peripheral.id,
+        Scooter.service,
+        Scooter.characteristics.notify,
+      );
+      await BleManager.disconnect(peripheral.id);
+      this.setPeripheralConnection(peripheral.id, false);
+      return;
     }
 
     await BleManager.connect(peripheral.id);
@@ -191,19 +216,41 @@ export default class App extends Component {
 
     await BleManager.startNotification(
       peripheral.id,
-      ScooterServices.BATTERY_SERVICE.service,
-      ScooterServices.BATTERY_SERVICE.characteristics.levelNotify,
-    );
+      Scooter.service,
+      Scooter.characteristics.notify,
+    ).then(() => console.log('notification started'));
 
-    const currentLevel = await BleManager.read(
-      peripheral.id,
-      ScooterServices.BATTERY_SERVICE.service,
-      ScooterServices.BATTERY_SERVICE.characteristics.level,
-    );
+    const message = makeMessageForLock();
+    console.log('message', message);
+
+    const unlock = (time) =>
+      setTimeout(() => {
+        BleManager.write(
+          peripheral.id,
+          Scooter.service,
+          Scooter.characteristics.write,
+          makeMessageForUnlock(),
+        ).then((res) => {
+          console.log('wrote lock!!', res);
+        });
+      }, time * 1000);
+
+    setTimeout(() => {
+      BleManager.write(
+        peripheral.id,
+        Scooter.service,
+        Scooter.characteristics.write,
+        message,
+      ).then((res) => {
+        console.log('wrote lock!!', res);
+        const time = 15;
+        console.log(`unlocking in ${time} secs`);
+        unlock(time);
+      });
+    }, 2000);
 
     if (p) {
       p.connected = true;
-      p.battery = currentLevel;
       peripherals.set(peripheral.id, p);
       this.setState({peripherals});
     }
@@ -250,13 +297,21 @@ export default class App extends Component {
               padding: 2,
               paddingBottom: 20,
             }}>
-            Battery Level {item.battery || 'Unknown'}{' '}
+            Battery Level {item.battery || 'Unknown'}
           </Text>
           {/*  */}
           {/* Button for locking/unlocking */}
         </View>
       </TouchableHighlight>
     );
+  }
+
+  setPeripheralConnection(pId, state) {
+    const peripherals = this.state.peripherals;
+    const p = peripherals.get(pId);
+    p.connected = state;
+    peripherals.set(pId, p);
+    this.setState({peripherals});
   }
 
   render() {
