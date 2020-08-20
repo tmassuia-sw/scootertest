@@ -20,7 +20,9 @@ import {
   Scooter,
   makeMessageForLock,
   makeMessageForUnlock,
+  makeMessageForBattery,
 } from './ScooterServices';
+import ScooterLib from './Scooter';
 
 const window = Dimensions.get('window');
 
@@ -33,7 +35,9 @@ export default class App extends Component {
 
     this.state = {
       scanning: false,
-      peripherals: new Map(),
+      // peripherals: new Map(),
+      scooters: new Map(),
+      connectedScooter: null,
       appState: '',
     };
 
@@ -51,27 +55,32 @@ export default class App extends Component {
   componentDidMount() {
     AppState.addEventListener('change', this.handleAppStateChange);
 
-    BleManager.start({showAlert: false}).then(
-      () => console.log('started'),
-      () => console.log('err'),
+    // BleManager.start({showAlert: false}).then(
+    //   () => console.log('started'),
+    //   () => console.log('err'),
+    // );
+
+    ScooterLib.boot().then(
+      () => console.log('Booted'),
+      () => console.log('error booting'),
     );
 
-    this.handlerDiscover = bleManagerEmitter.addListener(
-      'BleManagerDiscoverPeripheral',
-      this.handleDiscoverPeripheral,
-    );
-    this.handlerStop = bleManagerEmitter.addListener(
-      'BleManagerStopScan',
-      this.handleStopScan,
-    );
-    this.handlerDisconnect = bleManagerEmitter.addListener(
-      'BleManagerDisconnectPeripheral',
-      this.handleDisconnectedPeripheral,
-    );
-    this.handlerUpdate = bleManagerEmitter.addListener(
-      'BleManagerDidUpdateValueForCharacteristic',
-      this.handleUpdateValueForCharacteristic,
-    );
+    // this.handlerDiscover = bleManagerEmitter.addListener(
+    //   'BleManagerDiscoverPeripheral',
+    //   this.handleDiscoverPeripheral,
+    // );
+    // this.handlerStop = bleManagerEmitter.addListener(
+    //   'BleManagerStopScan',
+    //   this.handleStopScan,
+    // );
+    // this.handlerDisconnect = bleManagerEmitter.addListener(
+    //   'BleManagerDisconnectPeripheral',
+    //   this.handleDisconnectedPeripheral,
+    // );
+    // this.handlerUpdate = bleManagerEmitter.addListener(
+    //   'BleManagerDidUpdateValueForCharacteristic',
+    //   this.handleUpdateValueForCharacteristic,
+    // );
 
     if (Platform.OS === 'android') {
       BleManager.enableBluetooth().then(
@@ -115,10 +124,10 @@ export default class App extends Component {
   }
 
   componentWillUnmount() {
-    this.handlerDiscover.remove();
-    this.handlerStop.remove();
-    this.handlerDisconnect.remove();
-    this.handlerUpdate.remove();
+    // this.handlerDiscover.remove();
+    // this.handlerStop.remove();
+    // this.handlerDisconnect.remove();
+    // this.handlerUpdate.remove();
   }
 
   handleDisconnectedPeripheral(data) {
@@ -146,34 +155,45 @@ export default class App extends Component {
     console.log('Scan is stopped');
     this.setState({scanning: false});
   }
-
   startScan() {
-    if (!this.state.scanning) {
-      //this.setState({peripherals: new Map()});
-      BleManager.scan([Scooter.service], 3, true)
-        .then((results) => {
-          console.log('Scanning...');
-          this.setState({scanning: true});
-        })
-        .catch((err) => {
-          console.error('caught err', err);
-        });
-    }
+    const onScooterDiscover = (scooter) => {
+      const scooterList = this.state.scooters;
+
+      if (!scooterList.has(scooter.id)) {
+        scooterList.set(scooter.id, scooter);
+        this.setState({scooters: scooterList});
+      }
+    };
+
+    const onScanComplete = () => this.setState({scanning: false});
+
+    this.setState({scanning: true});
+    ScooterLib.searchScooters(10).subscribe(
+      onScooterDiscover,
+      () => {},
+      onScanComplete,
+    );
+
+    // if (!this.state.scanning) {
+    //   //this.setState({peripherals: new Map()});
+    //   BleManager.scan([Scooter.service], 3, true)
+    //     .then((results) => {
+    //       console.log('Scanning...');
+    //       this.setState({scanning: true});
+    //     })
+    //     .catch((err) => {
+    //       console.error('caught err', err);
+    //     });
+    // }
   }
 
   retrieveConnected() {
-    BleManager.getConnectedPeripherals([]).then((results) => {
-      if (results.length === 0) {
-        console.log('No connected peripherals');
-      }
-      console.log(results);
-      var peripherals = this.state.peripherals;
-      for (var i = 0; i < results.length; i++) {
-        var peripheral = results[i];
-        peripheral.connected = true;
-        peripherals.set(peripheral.id, peripheral);
-        this.setState({peripherals});
-      }
+    ScooterLib.getConnected().subscribe((connectedScooters) => {
+      const scooterList = this.state.scooters;
+      connectedScooters.forEach((cs) => {
+        scooterList.set(cs.id, cs);
+      });
+      this.setState({scooters: scooterList});
     });
   }
 
@@ -187,77 +207,139 @@ export default class App extends Component {
     this.setState({peripherals});
   }
 
-  async test(peripheral) {
-    if (!peripheral) {
+  // async test(peripheral) {
+  //   if (!peripheral) {
+  //     return;
+  //   }
+
+  //   if (peripheral.connected) {
+  //     await BleManager.stopNotification(
+  //       peripheral.id,
+  //       Scooter.service,
+  //       Scooter.characteristics.notify,
+  //     ).then(() => console.log('notification stopped'));
+  //     if (peripheral.subscription) {
+  //       peripheral.subscription.remove();
+  //     }
+  //     await BleManager.disconnect(peripheral.id);
+  //     this.setPeripheralConnection(peripheral.id, false);
+  //     return;
+  //   }
+
+  //   await BleManager.connect(peripheral.id);
+  //   const peripherals = this.state.peripherals;
+  //   const p = peripherals.get(peripheral.id);
+
+  //   // probably not necessary, services + characteristics are hardcoded
+  //   const services = await BleManager.retrieveServices(peripheral.id);
+  //   console.log(
+  //     `Retrieved services for peripheral ${peripheral.name} [${peripheral.id}]`,
+  //   );
+  //   console.log(JSON.stringify(services));
+
+  //   await BleManager.startNotification(
+  //     peripheral.id,
+  //     Scooter.service,
+  //     Scooter.characteristics.notify,
+  //   ).then(() => console.log('notification started'));
+
+  //   const subscription = bleManagerEmitter.addListener(
+  //     'BleManagerDidUpdateValueForCharacteristic',
+  //     (data) => 'received update for characteristic: ' + JSON.stringify(data),
+  //   );
+
+  //   const message = makeMessageForLock();
+  //   console.log('message', message);
+
+  //   const unlock = (time) =>
+  //     setTimeout(() => {
+  //       BleManager.write(
+  //         peripheral.id,
+  //         Scooter.service,
+  //         Scooter.characteristics.write,
+  //         makeMessageForUnlock(),
+  //       ).then((res) => {
+  //         console.log('wrote unlock!!', res);
+  //       });
+  //     }, time * 1000);
+
+  //   const getBattery = () => {
+  //     console.log('sending payload to get battery');
+  //     BleManager.write(
+  //       peripheral.id,
+  //       Scooter.service,
+  //       Scooter.characteristics.write,
+  //       makeMessageForBattery(),
+  //     ).then(() => console.log('sent!'));
+  //   };
+
+  //   setTimeout(() => {
+  //     BleManager.write(
+  //       peripheral.id,
+  //       Scooter.service,
+  //       Scooter.characteristics.write,
+  //       message,
+  //     ).then((res) => {
+  //       console.log('wrote lock!!', res);
+  //       const time = 15;
+  //       getBattery();
+  //       console.log(`unlocking in ${time} secs`);
+  //       unlock(time);
+  //     });
+  //   }, 2000);
+
+  //   if (p) {
+  //     p.connected = true;
+  //     p.subscription = subscription;
+  //     peripherals.set(peripheral.id, p);
+  //     this.setState({peripherals});
+  //   }
+  // }
+
+  async test(scooter) {
+    //connect
+    if (scooter.isConnected) {
+      await scooter.disconnect().toPromise();
       return;
     }
 
-    if (peripheral.connected) {
-      await BleManager.stopNotification(
-        peripheral.id,
-        Scooter.service,
-        Scooter.characteristics.notify,
-      );
-      await BleManager.disconnect(peripheral.id);
-      this.setPeripheralConnection(peripheral.id, false);
-      return;
-    }
-
-    await BleManager.connect(peripheral.id);
-    const peripherals = this.state.peripherals;
-    const p = peripherals.get(peripheral.id);
-
-    // probably not necessary, services + characteristics are hardcoded
-    const services = await BleManager.retrieveServices(peripheral.id);
-    console.log(
-      `Retrieved services for peripheral ${peripheral.name} [${peripheral.id}]`,
-    );
-    console.log(JSON.stringify(services));
-
-    await BleManager.startNotification(
-      peripheral.id,
-      Scooter.service,
-      Scooter.characteristics.notify,
-    ).then(() => console.log('notification started'));
-
-    const message = makeMessageForLock();
-    console.log('message', message);
+    await scooter.connect().toPromise();
+    this.setState({connectedScooter: scooter});
 
     const unlock = (time) =>
-      setTimeout(() => {
-        BleManager.write(
-          peripheral.id,
-          Scooter.service,
-          Scooter.characteristics.write,
-          makeMessageForUnlock(),
-        ).then((res) => {
-          console.log('wrote lock!!', res);
-        });
-      }, time * 1000);
+      setTimeout(
+        () =>
+          scooter
+            .unlock()
+            .toPromise()
+            .then(() => console.log('unlocked')),
+        time,
+      );
+    const lockthenunlock = (toStart, timeLocked) => {
+      setTimeout(
+        () =>
+          scooter
+            .lock()
+            .toPromise()
+            .then(() => {
+              console.log('locked');
+              unlock(timeLocked);
+            }),
+        toStart,
+      );
+    };
+    //lock in 2 secs
 
-    setTimeout(() => {
-      BleManager.write(
-        peripheral.id,
-        Scooter.service,
-        Scooter.characteristics.write,
-        message,
-      ).then((res) => {
-        console.log('wrote lock!!', res);
-        const time = 15;
-        console.log(`unlocking in ${time} secs`);
-        unlock(time);
-      });
-    }, 2000);
-
-    if (p) {
-      p.connected = true;
-      peripherals.set(peripheral.id, p);
-      this.setState({peripherals});
-    }
+    lockthenunlock(2000, 15000);
+    console.log('asking for battery');
+    scooter.getBattery().subscribe((data) => {
+      console.log('responded with Data!');
+      console.log(JSON.stringify(data));
+    });
   }
 
   renderItem(item) {
-    const color = item.connected ? 'green' : '#fff';
+    const color = item.isConnected ? 'green' : '#fff';
     return (
       <TouchableHighlight onPress={() => this.test(item)}>
         <View style={[styles.row, {backgroundColor: color}]}>
@@ -268,7 +350,7 @@ export default class App extends Component {
               color: '#333333',
               padding: 10,
             }}>
-            {item.name}
+            {item.peripheralData.name || 'no name'}
           </Text>
           <Text
             style={{
@@ -277,7 +359,7 @@ export default class App extends Component {
               color: '#333333',
               padding: 2,
             }}>
-            RSSI: {item.rssi}
+            RSSI: {item.peripheralData.rssi}
           </Text>
           <Text
             style={{
@@ -310,12 +392,15 @@ export default class App extends Component {
     const peripherals = this.state.peripherals;
     const p = peripherals.get(pId);
     p.connected = state;
+    if (!state) {
+      p.subscription = null;
+    }
     peripherals.set(pId, p);
     this.setState({peripherals});
   }
 
   render() {
-    const list = Array.from(this.state.peripherals.values());
+    const list = Array.from(this.state.scooters.values());
     const btnScanTitle =
       'Scan Bluetooth (' + (this.state.scanning ? 'on' : 'off') + ')';
 
