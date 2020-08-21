@@ -330,7 +330,8 @@ export default class App extends Component {
     };
     //lock in 2 secs
 
-    lockthenunlock(2000, 15000);
+    // lockthenunlock(2000, 15000);
+
     console.log('asking for battery');
     scooter.getBattery().subscribe((data) => {
       console.log('responded with Data!');

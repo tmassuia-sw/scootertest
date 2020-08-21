@@ -11,11 +11,45 @@ const bleManagerEvents = new Observable((subscriber) => {
   (new NativeEventEmitter(NativeModules.BleManager)).addListener(
     'BleManagerDidUpdateValueForCharacteristic',
     (data) => {
-      console.log('received data from bleManager');
       subscriber.next(data);
     },
   );
 });
+
+/*
+public static String bytesToHex(byte[] bytes) {
+    char[] hexChars = new char[bytes.length * 2];
+
+    for (int j = 0; j < bytes.length; j++) {
+        int v = 
+        hexChars[j * 2] = HEX_ARRAY[v >>> 4];
+        hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
+    }
+
+    return new String(hexChars);
+}
+
+bytes ->
+                try {
+                    val hexString = arrayOfNulls<String>(bytes.size)
+
+                    for (i in bytes.indices) {
+                        val temp = ByteArray(1)
+                        temp[0] = bytes[i]
+                        hexString[i] = HexString.bytesToHex(temp)
+                    }
+
+
+*/
+
+const hexArray = '0123456789ABCDEF'.split('');
+
+const intToHex = (val) => {
+  const v = val & 0xFF;
+  return `${hexArray[v >>> 4]}${hexArray[v & 0x0F]}`;
+};
+
+const bytesToHex = (byteList) => byteList.map(intToHex);
 
 export default class Scooter {
   constructor(data, connected = false) {
@@ -115,7 +149,17 @@ export default class Scooter {
     }
 
     //TODO: implement NbMessage lib to replace hardcoded payloads
-    const payload = [90, -91, 1, 62, 32, 1, -78, 2, -21, -2];
+    // const payload = [90, -91, 1, 62, 32, 1, -78, 2, -21, -2];
+    const payload = [90, -91, 1, 62, 34, 1, 50, 2, 105, -1];
+
+    const parseForBattery = (data) => {
+      const hexList = bytesToHex(data.value);
+      console.log('hexList', hexList);
+      const value = parseInt(hexList[8] + hexList[7], 16);
+      return value;
+    };
+
+    console.log('sending payload', bytesToHex(payload));
 
     return new Observable((subscriber) => {
       BleManager.write(
@@ -124,9 +168,9 @@ export default class Scooter {
         ScooterResources.characteristics.write,
         payload,
       ).then(() => {
-        console.log('sent payload ', payload);
-        console.log('subscribing to recieve data...');
-        bleManagerEvents.subscribe((data) => subscriber.next(data));
+        bleManagerEvents.subscribe((data) => {
+          subscriber.next(parseForBattery(data));
+        });
       });
     });
   }
