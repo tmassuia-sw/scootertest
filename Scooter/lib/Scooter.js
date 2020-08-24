@@ -174,4 +174,19 @@ export default class Scooter {
       });
     });
   }
+
+  watchSignal(time = 3000) {
+    return new Observable((subscriber) => {
+      let id = setInterval(() => {
+        console.log('loop');
+        BleManager.readRSSI(this.id).then((rssi) => {
+          subscriber.next(rssi);
+        });
+      }, time);
+      return () => {
+        clearInterval(id);
+        subscriber.complete();
+      };
+    });
+  }
 }
