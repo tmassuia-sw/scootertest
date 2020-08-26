@@ -173,18 +173,6 @@ export default class App extends Component {
       () => {},
       onScanComplete,
     );
-
-    // if (!this.state.scanning) {
-    //   //this.setState({peripherals: new Map()});
-    //   BleManager.scan([Scooter.service], 3, true)
-    //     .then((results) => {
-    //       console.log('Scanning...');
-    //       this.setState({scanning: true});
-    //     })
-    //     .catch((err) => {
-    //       console.error('caught err', err);
-    //     });
-    // }
   }
 
   retrieveConnected() {
@@ -207,95 +195,6 @@ export default class App extends Component {
     this.setState({peripherals});
   }
 
-  // async test(peripheral) {
-  //   if (!peripheral) {
-  //     return;
-  //   }
-
-  //   if (peripheral.connected) {
-  //     await BleManager.stopNotification(
-  //       peripheral.id,
-  //       Scooter.service,
-  //       Scooter.characteristics.notify,
-  //     ).then(() => console.log('notification stopped'));
-  //     if (peripheral.subscription) {
-  //       peripheral.subscription.remove();
-  //     }
-  //     await BleManager.disconnect(peripheral.id);
-  //     this.setPeripheralConnection(peripheral.id, false);
-  //     return;
-  //   }
-
-  //   await BleManager.connect(peripheral.id);
-  //   const peripherals = this.state.peripherals;
-  //   const p = peripherals.get(peripheral.id);
-
-  //   // probably not necessary, services + characteristics are hardcoded
-  //   const services = await BleManager.retrieveServices(peripheral.id);
-  //   console.log(
-  //     `Retrieved services for peripheral ${peripheral.name} [${peripheral.id}]`,
-  //   );
-  //   console.log(JSON.stringify(services));
-
-  //   await BleManager.startNotification(
-  //     peripheral.id,
-  //     Scooter.service,
-  //     Scooter.characteristics.notify,
-  //   ).then(() => console.log('notification started'));
-
-  //   const subscription = bleManagerEmitter.addListener(
-  //     'BleManagerDidUpdateValueForCharacteristic',
-  //     (data) => 'received update for characteristic: ' + JSON.stringify(data),
-  //   );
-
-  //   const message = makeMessageForLock();
-  //   console.log('message', message);
-
-  //   const unlock = (time) =>
-  //     setTimeout(() => {
-  //       BleManager.write(
-  //         peripheral.id,
-  //         Scooter.service,
-  //         Scooter.characteristics.write,
-  //         makeMessageForUnlock(),
-  //       ).then((res) => {
-  //         console.log('wrote unlock!!', res);
-  //       });
-  //     }, time * 1000);
-
-  //   const getBattery = () => {
-  //     console.log('sending payload to get battery');
-  //     BleManager.write(
-  //       peripheral.id,
-  //       Scooter.service,
-  //       Scooter.characteristics.write,
-  //       makeMessageForBattery(),
-  //     ).then(() => console.log('sent!'));
-  //   };
-
-  //   setTimeout(() => {
-  //     BleManager.write(
-  //       peripheral.id,
-  //       Scooter.service,
-  //       Scooter.characteristics.write,
-  //       message,
-  //     ).then((res) => {
-  //       console.log('wrote lock!!', res);
-  //       const time = 15;
-  //       getBattery();
-  //       console.log(`unlocking in ${time} secs`);
-  //       unlock(time);
-  //     });
-  //   }, 2000);
-
-  //   if (p) {
-  //     p.connected = true;
-  //     p.subscription = subscription;
-  //     peripherals.set(peripheral.id, p);
-  //     this.setState({peripherals});
-  //   }
-  // }
-
   async test(scooter) {
     //connect
     if (scooter.isConnected) {
@@ -306,37 +205,21 @@ export default class App extends Component {
     await scooter.connect().toPromise();
     this.setState({connectedScooter: scooter});
 
-    const unlock = (time) =>
-      setTimeout(
-        () =>
-          scooter
-            .unlock()
-            .toPromise()
-            .then(() => console.log('unlocked')),
-        time,
-      );
-    const lockthenunlock = (toStart, timeLocked) => {
-      setTimeout(
-        () =>
-          scooter
-            .lock()
-            .toPromise()
-            .then(() => {
-              console.log('locked');
-              unlock(timeLocked);
-            }),
-        toStart,
-      );
-    };
-    //lock in 2 secs
-
-    // lockthenunlock(2000, 15000);
-
     console.log('asking for battery');
     scooter.getBattery().subscribe((data) => {
-      console.log('responded with Data!');
+      console.log('Got Battery!');
       console.log(JSON.stringify(data));
     });
+
+    console.log('watching rssi for 10 seconds, then unsubscribing');
+    const subscription = scooter.watchSignal(2000).subscribe((signal) => {
+      console.log('got signal ' + signal);
+    });
+
+    setTimeout(() => {
+      console.log('unsubscribing...');
+      subscription.unsubscribe();
+    }, 10000);
   }
 
   renderItem(item) {

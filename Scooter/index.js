@@ -1,4 +1,4 @@
-import {NativeModules, NativeEventEmitter} from 'react-native';
+import {NativeModules, NativeEventEmitter, Platform} from 'react-native';
 import BleManager from 'react-native-ble-manager';
 import {Observable} from 'rxjs';
 
@@ -49,6 +49,11 @@ function searchScooters(timeout = 5) {
   return new Observable(handleSubscriber);
 }
 
-const boot = () => BleManager.start({showAlert: false});
+const boot = async () => {
+  if (Platform.OS === 'android') {
+    await BleManager.enableBluetooth();
+  }
+  await BleManager.start({showAlert: false});
+};
 
 export default {searchScooters, getConnected, boot};

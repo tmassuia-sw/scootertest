@@ -1,6 +1,7 @@
 /* eslint-disable no-bitwise */
 import {NativeEventEmitter, NativeModules} from 'react-native';
 import {Observable} from 'rxjs';
+import {take} from 'rxjs/operators';
 import BleManager from 'react-native-ble-manager';
 
 import ScooterResources from './enums/ScooterResources';
@@ -45,8 +46,8 @@ bytes ->
 const hexArray = '0123456789ABCDEF'.split('');
 
 const intToHex = (val) => {
-  const v = val & 0xFF;
-  return `${hexArray[v >>> 4]}${hexArray[v & 0x0F]}`;
+  const v = val & 0xff;
+  return `${hexArray[v >>> 4]}${hexArray[v & 0x0f]}`;
 };
 
 const bytesToHex = (byteList) => byteList.map(intToHex);
@@ -55,6 +56,13 @@ export default class Scooter {
   constructor(data, connected = false) {
     this.peripheralData = data;
     this.isConnected = connected;
+    //idk, stub vals
+    this.battery = 0;
+    this.signal = 1;
+  }
+
+  get name() {
+    return this.peripheralData.name;
   }
 
   get id() {
@@ -62,6 +70,8 @@ export default class Scooter {
   }
 
   _boot() {
+    //TODO: probably the notification is not starting, investigate on that
+    //actual problem is that we are not getting a response from the battery request
     return BleManager.connect(this.peripheralData.id)
       .then(() => BleManager.retrieveServices(this.peripheralData.id))
       .then(() =>
@@ -83,11 +93,24 @@ export default class Scooter {
 
   connect() {
     return new Observable((subscriber) => {
-      this._boot().then(() => {
-        this.isConnected = true;
-        subscriber.next();
-        subscriber.complete();
-      });
+      console.log('connecting');
+      this.isConnected = true;
+      this._boot()
+        .then(() => {
+          console.log('asking for battery');
+          return this.getBattery().pipe(take(1)).toPromise();
+        })
+        .then((battery) => {
+          console.log('got battery, got signal', battery);
+          this.battery = battery;
+          this.signal = this.peripheralData.rssi;
+          subscriber.next();
+          subscriber.complete();
+        })
+        .catch((err) => {
+          console.log('err', err);
+          this.isConnected = false;
+        });
     });
   }
 
@@ -149,17 +172,13 @@ export default class Scooter {
     }
 
     //TODO: implement NbMessage lib to replace hardcoded payloads
-    // const payload = [90, -91, 1, 62, 32, 1, -78, 2, -21, -2];
     const payload = [90, -91, 1, 62, 34, 1, 50, 2, 105, -1];
 
     const parseForBattery = (data) => {
       const hexList = bytesToHex(data.value);
-      console.log('hexList', hexList);
       const value = parseInt(hexList[8] + hexList[7], 16);
       return value;
     };
-
-    console.log('sending payload', bytesToHex(payload));
 
     return new Observable((subscriber) => {
       BleManager.write(
@@ -169,6 +188,7 @@ export default class Scooter {
         payload,
       ).then(() => {
         bleManagerEvents.subscribe((data) => {
+          console.log('responded');
           subscriber.next(parseForBattery(data));
         });
       });
@@ -178,7 +198,6 @@ export default class Scooter {
   watchSignal(time = 3000) {
     return new Observable((subscriber) => {
       let id = setInterval(() => {
-        console.log('loop');
         BleManager.readRSSI(this.id).then((rssi) => {
           subscriber.next(rssi);
         });
