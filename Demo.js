@@ -98,7 +98,7 @@ const App = () => {
         }
       };
 
-      const subscription = scooter.watchSignal(2)
+      const subscription = scooter.watchSignal()
         .subscribe(observer);
       setSubscription(subscription);
     }
