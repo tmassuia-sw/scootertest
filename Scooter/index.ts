@@ -1,4 +1,4 @@
-import {Platform} from 'react-native';
+import {Platform, PermissionsAndroid} from 'react-native';
 import {Observable} from 'rxjs';
 import {map} from 'rxjs/operators';
 import BleManager, {Peripheral} from 'react-native-ble-manager';
@@ -25,6 +25,16 @@ function searchScooters(timeout: number = 5): Observable<Scooter> {
 async function boot(): Promise<void> {
   if (Platform.OS === 'android') {
     await BleManager.enableBluetooth();
+
+    //check permissions
+    const hasPermission = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION);
+
+    if(!hasPermission) {
+      await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION
+      );
+    }
+
   }
   await BleManager.start({showAlert: false});
 };

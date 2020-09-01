@@ -64,7 +64,7 @@ const getList = (data, onSelect) => (
 const getDetail = (scooter) => (
   <View style={styles.containerCenter}>
     <Text style={styles.name}>{scooter.name}</Text>
-    <Text style={styles.signal}>Signal (RSSI): {Math.abs(scooter.signal) / 120 * 100}%</Text>
+    <Text style={styles.signal}>Signal (RSSI): {(Math.abs(scooter.signal) / 120 * 100).toFixed(1)}%</Text>
     <Text style={styles.battery}>
       Battery: <Text style={styles.bold}>{scooter.battery}%</Text>
     </Text>
