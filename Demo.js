@@ -8,7 +8,7 @@ import {
   FlatList,
 } from 'react-native';
 
-import ScooterLib from './Scooter';
+import ScooterLib from './Scooter/index.ts';
 
 const styles = StyleSheet.create({
   pad: {
@@ -64,7 +64,7 @@ const getList = (data, onSelect) => (
 const getDetail = (scooter) => (
   <View style={styles.containerCenter}>
     <Text style={styles.name}>{scooter.name}</Text>
-    <Text style={styles.signal}>Signal (RSSI): {scooter.signal}</Text>
+    <Text style={styles.signal}>Signal (RSSI): {Math.abs(scooter.signal) / 120 * 100}%</Text>
     <Text style={styles.battery}>
       Battery: <Text style={styles.bold}>{scooter.battery}%</Text>
     </Text>
@@ -83,6 +83,28 @@ const App = () => {
     booted: false,
   });
 
+  const [signalSubscription, setSubscription] = useState(null);
+
+  const watchScooterSignal = (scooter = state.selectedScooter) => {
+    if(scooter) {
+      const observer = {
+        next: (value) => {
+          newSignalScooter = scooter;
+          newSignalScooter.signal = value;
+          setState({...state, show: 'detail', selectedScooter: newSignalScooter})
+        },
+        complete: () => {
+          setSubscription(null);
+        }
+      };
+
+      const subscription = scooter.watchSignal(2)
+        .subscribe(observer);
+      setSubscription(subscription);
+    }
+
+  }
+
   const selectScooter = (scooterId) => {
     const scooter = state.scooters[scooterId];
     console.log('selected scooter is', scooterId, scooter);
@@ -95,11 +117,17 @@ const App = () => {
           show: 'detail',
           selectedScooter: scooter,
         });
+
+        watchScooterSignal(scooter);
       })
       .catch((err) => console.log('caught err', err, err.stack));
+
   };
 
+  
+
   const scanScooters = () => {
+    console.log('scanning')
     ScooterLib.searchScooters().subscribe((scooter) => {
       const scooterList = state.scooters;
 
@@ -116,12 +144,13 @@ const App = () => {
       .disconnect()
       .toPromise()
       .then(() => {
+        signalSubscription.unsubscribe();
         setState({...state, selectedScooter: null, show: 'list'});
       });
   };
 
   const getViewByState = (show) => {
-    console.log('state is', JSON.stringify(state));
+    console.log('state is', (state), signalSubscription);
     if (show === 'list') {
       return getList(Object.values(state.scooters), selectScooter);
     }
